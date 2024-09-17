@@ -25,3 +25,9 @@ Prije pokretanja aplikacije, potrebno je unijeti Google Maps API ključ. Slijedi
 
 te u constants.dart datoteci.
 
+## Pokretanje Flutter aplikacije
+
+1. Pokretanje `flutter pub get` za dohvat dependencies
+2. Pokretanje emulatora ili stvarnog uređaja
+3. Pokretanje `flutter run` 
+
