@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:convert'; // For decoding JSON
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:fun_drive/consts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:http/http.dart' as http; // Import the http package
+import 'package:http/http.dart' as http; 
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:custom_info_window/custom_info_window.dart';
 import 'package:location/location.dart';
@@ -23,13 +23,34 @@ class _MapPageState extends State<MapPage> {
   Completer<GoogleMapController>();
   final CustomInfoWindowController _customInfoWindowController =
   CustomInfoWindowController();
+  bool _isUserInteracting = false;
+  Timer? _interactionTimer; // Timer to delay resetting the flag
+
+
 
   LatLng? _currentP = null;
   Map<PolylineId, Polyline> polylines = {};
   Set<Marker> _markers = {}; // Store all the markers
+  BitmapDescriptor customIcon = BitmapDescriptor.defaultMarker;
+  void cstmMarker() {
+    BitmapDescriptor.fromAssetImage(
+      const ImageConfiguration(), // Using default size
+      "assets/images/ogstar.png",
+    ).then((icon) {
+      setState(() {
+        customIcon = icon;
+      });
+      print('Custom icon loaded successfully');
+    }).catchError((error) {
+      print('Error loading custom icon: $error');
+    });
+  }
+
+
 
   @override
   void initState() {
+    cstmMarker();
     super.initState();
     getLocationUpdates().then(
           (_) {
@@ -39,6 +60,7 @@ class _MapPageState extends State<MapPage> {
         });
       },
     );
+
   }
 
   @override
@@ -56,12 +78,23 @@ class _MapPageState extends State<MapPage> {
             },
             onCameraMove: (position) {
               _customInfoWindowController.onCameraMove!();
+
+              // Set the flag to true when user is interacting with the map
+              _isUserInteracting = true;
+
+              // Cancel any previous timers
+              _interactionTimer?.cancel();
+
+              // Start a new timer to reset the interaction flag after a short delay (e.g., 2 seconds)
+              _interactionTimer = Timer(Duration(seconds: 10), () {
+                _isUserInteracting = false;
+              });
             },
             onMapCreated: (GoogleMapController controller) async {
               _customInfoWindowController.googleMapController = controller;
               _mapController.complete(controller); // Ensure map controller is set
             },
-            initialCameraPosition: const CameraPosition(
+            initialCameraPosition: CameraPosition(
               target: LatLng(43.34583290192481, 17.7967256308148),
               zoom: 13,
             ),
@@ -71,7 +104,7 @@ class _MapPageState extends State<MapPage> {
           CustomInfoWindow(
             controller: _customInfoWindowController,
             height: 300,
-            width: 340,
+            width: 300,
             offset: 50,
           ),
         ],
@@ -103,6 +136,9 @@ class _MapPageState extends State<MapPage> {
                   title: item['name'],
                   snippet: item['description'],
                 ),
+                icon:
+                customIcon
+                ,
                 onTap: () {
                   _customInfoWindowController.addInfoWindow!(
                     Container(
@@ -154,15 +190,19 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _cameraToPosition(LatLng pos) async {
-    final GoogleMapController controller = await _mapController.future;
-    CameraPosition _newCameraPosition = CameraPosition(
-      target: pos,
-      zoom: 13,
-    );
-    await controller.animateCamera(
-      CameraUpdate.newCameraPosition(_newCameraPosition),
-    );
+    // Only move the camera if the user is not interacting with the map
+    if (!_isUserInteracting) {
+      final GoogleMapController controller = await _mapController.future;
+      CameraPosition _newCameraPosition = CameraPosition(
+        target: pos,
+        zoom: 13,
+      );
+      await controller.animateCamera(
+        CameraUpdate.newCameraPosition(_newCameraPosition),
+      );
+    }
   }
+
 
   Future<void> getLocationUpdates() async {
     bool _serviceEnabled;
@@ -184,6 +224,15 @@ class _MapPageState extends State<MapPage> {
       if (currentLocation.latitude != null && currentLocation.longitude != null) {
         setState(() {
           _currentP = LatLng(currentLocation.latitude!, currentLocation.longitude!);
+          Marker currentLocationMarker = Marker(
+            markerId: MarkerId("_currentLocation"),
+            icon: BitmapDescriptor.defaultMarker,
+            position: _currentP!,
+          );
+
+          // Add the current location marker to the set
+          _markers.add(currentLocationMarker);
+
           _cameraToPosition(_currentP!);
         });
       }
@@ -197,7 +246,7 @@ class _MapPageState extends State<MapPage> {
       googleApiKey: GOOGLE_MAPS_API_KEY,
       request: PolylineRequest(
         origin: PointLatLng(43.34583290192481, 17.7967256308148),
-        destination: PointLatLng(43.11654170482214, 17.7064743399809),
+        destination: PointLatLng(43.82490037967646, 17.007283280479488),
         mode: TravelMode.driving,
       ),
     );
